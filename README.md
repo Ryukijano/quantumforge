@@ -1,6 +1,6 @@
-# qhybrid: High-Performance Quantum-Classical Simulation in Rust
+# QuantumForge 🛠️⚛️: High-Performance Quantum-Classical Simulation in Rust
 
-`qhybrid` is a Rust-accelerated toolkit for quantum circuit simulation and hybrid algorithm development. It bridges the gap between high-level Python orchestration (Qiskit) and low-level systems performance (Rust), enabling ultra-fast simulation of noisy quantum systems and variational algorithms.
+`QuantumForge` is a cutting-edge Rust-accelerated toolkit for quantum circuit simulation and hybrid algorithm development. It bridges the gap between high-level Python orchestration (Qiskit) and low-level systems performance (Rust), enabling ultra-fast simulation of noisy quantum systems and variational algorithms.
 
 ## 🚀 Performance Overview (HPC Stress Test)
 
@@ -102,7 +102,7 @@ graph TD
 - **`rust_kernels`**: The core simulation engine. Exposes statevector and density matrix kernels to Python via PyO3. Supports Pauli noise, Kraus operators, and full circuit execution.
 - **`vqe`**: A pure-Rust Variational Quantum Eigensolver pipeline. Includes molecular Hamiltonian mappings ($H_2$ minimal) and Hardware-Efficient ansatz implementation.
 - **`gqe`**: A Generative Quantum Eigensolver using evolutionary algorithms to discover optimal circuit structures for ground state estimation.
-- **`python/`**: Python bindings, Qiskit adapters, and HPC benchmarks including **cuQuantum-style GPU acceleration** for seamless integration into existing quantum workflows.
+- **`python/`**: Python bindings, Qiskit adapters, and HPC benchmarks with **real Qiskit-Aer support** (no simulations) for seamless integration into existing quantum workflows.
 
 ## 🛠️ Installation & Usage
 
