@@ -104,6 +104,70 @@ graph TD
 - **`gqe`**: A Generative Quantum Eigensolver using evolutionary algorithms to discover optimal circuit structures for ground state estimation.
 - **`python/`**: Python bindings, Qiskit adapters, and HPC benchmarks with **real Qiskit-Aer support** (no simulations) for seamless integration into existing quantum workflows.
 
+## 🤝 Integration in Syndrome-Net
+
+`qhybrid` is intentionally optional and is wired into the Syndrome-Net runtime through a capability-based contract:
+
+- `surface_code_in_stem/accelerators/qhybrid_backend.py` imports functions from this package and exposes:
+  - `probe_capability()` (returns a capability object for runtime metadata and degraded-state diagnostics; consumers read fields via attributes such as `.enabled`)
+  - `apply_pauli_channel_statevector(...)`
+  - `apply_kraus_1q_density_matrix(...)`
+  - `apply_correlated_pauli_noise_statevector(...)`
+  - `apply_cnot_error_statevector(...)`
+  - `expectation_value_pauli_string_py(...)`
+- `surface_code_in_stem/accelerators/sampling_backends.py` builds sampler backends through `_probe_backends()` and `build_sampling_backend(...)`.
+- `app/rl_runner.py` sets default acceleration behavior by reading the capability object's `.enabled` attribute via `qhybrid_backend.probe_capability().enabled`.
+- `app/streamlit_app.py` also uses the same probe for auto-selection in the UI.
+- `surface_code_in_stem/rl_control/gym_env.py` passes both `backend_override` and `use_accelerated` into `build_sampling_backend(...)`.
+
+### Backend resolution contract
+
+Sampling backend candidate order is:
+
+`qhybrid -> cuquantum -> qujax -> cudaq -> stim`
+
+Selection rules:
+
+- `auto` mode uses the full candidate order above.
+- Explicit backend override uses the override first.
+- `use_accelerated=True` constrains resolution to the explicit override only.
+- If a candidate is unavailable or fails, resolver falls back to the next candidate.
+- Final fallback is always `stim`.
+
+### Backend dependency matrix (runtime)
+
+| Backend ID | Dependency/module | Probe condition | Default enabled state | Syndrome-Net fallback |
+|---|---|---|---|---|
+| `qhybrid` | `qhybrid_kernels` extension (`quantumforge/python`) | `qhybrid_backend.probe_capability()["enabled"]` | `True` when Rust extension imports cleanly | Disabled path falls back to `stim` with `qhybrid_fallback` trace token |
+| `cuquantum` | `cuquantum.tensornet` | Module import succeeds | `True` when package import works | Disabled path falls back to next candidate |
+| `qujax` | `jax` (package import) | Module import succeeds | `True` when Jupyter/JAX is importable | Current path is still wrapper-based fallback to `stim` |
+| `cudaq` | `cudaq` | Module import succeeds | `True` when package import works | Disabled path falls back to next candidate |
+| `stim` | `stim` | Module import succeeds | `True` when base simulation dependency exists | Baseline fallback target, never skipped unless explicit unknown override |
+
+## Merge and sync strategy with Syndrome-Net
+
+This repository is currently consumed by Syndrome-Net as an internal directory (`quantumforge/`), but the same accelerator can also be maintained independently.
+
+Recommended operating modes:
+
+- **Monorepo snapshot mode** (current): periodically sync upstream `quantumforge` into this directory and validate through contract tests.
+- **Split-repo release mode**: publish wheels from the dedicated `quantumforge` source, then consume via package dependency in `requirements.*`.
+
+Validation checklist after sync:
+
+1. `qhybrid_backend.probe_capability()` is callable and reports expected defaults.
+2. `python3 scripts/bench_runtime_contracts.py --output ...` still includes expected `backend_chain_tokens`.
+3. `python3 -m pytest tests/test_cuda_q_decoder.py tests/test_sampling_backend_contracts.py` against the parent Syndrome-Net checkout.
+
+### CI-backed contract checks
+
+- `backend-contract-matrix` job validates all IDs in
+  `backend_override ∈ {stim, qhybrid, cuquantum, qujax, cudaq}`.
+- `qhybrid-kernels` job validates:
+  - accelerated build path (`accelerated=true`) with `maturin develop`
+  - fallback-only path (`accelerated=false`) with pure-Python load expectations.
+- `hf-smoke` job runs with `accelerated` true/false and enforces the expected metadata contract.
+
 ## 🛠️ Installation & Usage
 
 ### Prerequisites
@@ -111,21 +175,30 @@ graph TD
 - Python 3.9+
 - `maturin` (for building Python bindings)
 
-### Building the Python Package
+### Build the package and extension module
+
+From repository root:
+
 ```bash
-cd rust/qhybrid/python
+cd python
+python -m pip install maturin
 maturin develop
+```
+
+Release / non-editable build:
+
+```bash
+cd python
+maturin build --release
 ```
 
 ### Running the VQE Demo
 ```bash
-cd rust/qhybrid
 cargo run --bin vqe
 ```
 
 ### Running the GQE Demo
 ```bash
-cd rust/qhybrid
 cargo run --bin gqe
 ```
 
@@ -153,3 +226,11 @@ conda run -n qiskit python python/benchmarks/compare_simulators.py
 
 ## 📄 License
 MIT License. Created as a holiday implementation practice for high-performance scientific computing in Rust.
+
+## Repo sync notes for Syndrome-Net consumers
+
+This repository snapshot is intended to be merged into Syndrome-Net with an explicit dependency and contract plan:
+
+- keep this tree in lockstep with `README` and backend contract exports in Syndrome-Net.
+- run `python scripts/bench_runtime_contracts.py` after any ABI or build-system changes.
+- if `qhybrid` importability changes, update `backend_contracts` expectations in upstream CI.
