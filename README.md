@@ -109,14 +109,14 @@ graph TD
 `qhybrid` is intentionally optional and is wired into the Syndrome-Net runtime through a capability-based contract:
 
 - `surface_code_in_stem/accelerators/qhybrid_backend.py` imports functions from this package and exposes:
-  - `probe_capability()` (for runtime metadata and degraded-state diagnostics)
+  - `probe_capability()` (returns a capability object for runtime metadata and degraded-state diagnostics; consumers read fields via attributes such as `.enabled`)
   - `apply_pauli_channel_statevector(...)`
   - `apply_kraus_1q_density_matrix(...)`
   - `apply_correlated_pauli_noise_statevector(...)`
   - `apply_cnot_error_statevector(...)`
   - `expectation_value_pauli_string_py(...)`
 - `surface_code_in_stem/accelerators/sampling_backends.py` builds sampler backends through `_probe_backends()` and `build_sampling_backend(...)`.
-- `app/rl_runner.py` sets default acceleration behavior by reading `qhybrid_backend.probe_capability().enabled`.
+- `app/rl_runner.py` sets default acceleration behavior by reading the capability object's `.enabled` attribute via `qhybrid_backend.probe_capability().enabled`.
 - `app/streamlit_app.py` also uses the same probe for auto-selection in the UI.
 - `surface_code_in_stem/rl_control/gym_env.py` passes both `backend_override` and `use_accelerated` into `build_sampling_backend(...)`.
 
